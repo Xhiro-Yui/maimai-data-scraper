@@ -174,3 +174,11 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+
+## Maimai Data Scraper specific files
+# Project generated files
+config.env
+scraper/application/
+
+# Browser driver folders
+chromedriver-win32/
