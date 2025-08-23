@@ -3,6 +3,10 @@ import sys
 from .chrome_driver import create_chrome_driver
 
 
+class BrowserDriver:
+
+
+
 def initialize_driver(config):
     browser = config.get("BROWSER", "headless").strip().lower()
     if browser not in ["chrome", "firefox", "headless"]:

@@ -10,7 +10,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from scraper.login_session import get_requests_session_from_driver, login
-from scraper.setup import get_connection
 
 
 def browser_scrape(config, driver):

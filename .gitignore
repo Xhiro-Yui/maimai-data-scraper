@@ -179,6 +179,5 @@ pyrightconfig.json
 # Project generated files
 config.env
 scraper/application/
-
 # Browser driver folders
 chromedriver-win32/
