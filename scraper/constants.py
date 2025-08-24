@@ -29,7 +29,7 @@ class Endpoints:
     # Define all endpoints per region
     _REGIONS = {
         "INTL": {
-            "LOGIN_PAGE": "https://www.google.com",
+            "LOGIN_PAGE": "https://maimaidx-eng.com/maimai-mobile/login/",
             "LOGOUT_PAGE": "https://www.google.com/logout",
             "HOME_PAGE": "https://www.google.com/home"
         },
@@ -39,6 +39,7 @@ class Endpoints:
             "HOME_PAGE": "https://www.google.co.jp/home"
         }
     }
+
 
 def load_endpoints(region: str):
     """

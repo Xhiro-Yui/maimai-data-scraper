@@ -2,13 +2,11 @@
 
 Uses your login credentials.
 
-To compile into exe
-`pyinstaller --onefile --name maimai_data_scraper scraper/main.py`
+---
 
-To run this project, first run
+### For developers
 
-`setup.bat`
-
-To update requirements.txt file, run
-
-`generate_requirements.bat`
+1. `generate_requirements.bat` - Updates requirement.txt file
+2. `generate_models.py` - Automatically creates model files for the tables
+3. `build_exe.bat` - Compiles project into .exe file
+4. `setup.bat` - Initial setup of project, creates a local .venv folder, then installs requirements.txt

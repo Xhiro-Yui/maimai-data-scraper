@@ -24,8 +24,7 @@ class Database:
             db_name (str): The name of the SQLite database file. Defaults to "maimai_data.db".
         """
         self._db_name: str = db_name
-        self._app_data_dir_name: str = "application"
-        self._db_path: str = resolve_app_file_path(filename=self._db_name, app_data_dir_name=self._app_data_dir_name)
+        self._db_path: str = resolve_app_file_path(filename=self._db_name)
         self._connection: Optional[sqlite3.Connection] = None  # Persistent connection held by the object
 
         logging.info(f"Initializing database schemas for {self._db_path}")

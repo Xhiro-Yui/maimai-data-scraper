@@ -81,6 +81,7 @@ class Config:
         PASSWORD=
         BROWSER=
         REGION=
+        LANGUAGE=en
 
         ### Do not touch the section below unless you know what you are doing
         
@@ -93,6 +94,7 @@ class Config:
         # They are never sent anywhere except to log in to maimai website
         # REGION should be one of the following: jp, japan, intl, international
         # BROWSER should be one of the following: chrome, firefox, headless
+        # LANGUAGE should be one of the following: en, ja
         """)
 
         logging.info("No existing config found. Creating default config file.")
