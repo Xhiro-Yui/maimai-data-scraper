@@ -55,11 +55,18 @@ class Config:
             input("Press Enter to exit...")
             sys.exit(1)
 
-    def get(self, key: str):
-        value = self._values.get(key)
-        if value is None:
-            raise Exception(f"Missing required config : {key}")
-        return value
+    def get(self, key: str, default=None) -> str:
+        if key in self._values:
+            return self._values[key]
+
+        if default is not None:
+            return default
+
+        raise Exception(f"Missing required config: {key}")
+
+    def get_int(self, key: str, default: int = None) -> int:
+        value = self.get(key, default)
+        return int(value)
 
     @property
     def logging_level(self) -> str:
@@ -87,8 +94,8 @@ class Config:
         
         CHECK_INTERVAL_MINUTES=5
         LOGGING=INFO
-        UI_WAIT_DELAY=10
-        UI_WAIT_TIMEOUT=60
+        UI_WAIT_DELAY=5
+        UI_WAIT_TIMEOUT=15
 
         # These credentials are stored locally only.
         # They are never sent anywhere except to log in to maimai website

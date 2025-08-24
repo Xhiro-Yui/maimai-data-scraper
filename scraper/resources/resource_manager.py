@@ -1,12 +1,10 @@
 import atexit
-import json
 import logging
 
 from scraper.constants import File, load_endpoints
 from scraper.resources.config import Config
 from scraper.resources.database import Database
 from scraper.resources.i18n.messages import Messages
-from scraper.utils.path_resolver import resolve_app_file_path
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,7 +35,20 @@ class ResourceManager:
         logging.info("ResourceManager setup complete")
 
     def get_message(self, key: str) -> str:
-        return getattr(self._lang_class, key, getattr(Messages.EN, key, key))
+        value = getattr(self._lang_class, key, None)
+
+        if value is not None:
+            return value
+
+        # Missing in target language, fallback to English
+        fallback_value = getattr(Messages.EN, key, key)
+
+        # Log a warning
+        logging.warning(
+            f"Missing translation for key '{key}' in language '{self._lang_class.__name__}', using fallback."
+        )
+
+        return fallback_value
 
     def shutdown(self) -> None:
         if self.database is not None:
