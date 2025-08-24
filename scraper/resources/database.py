@@ -1,11 +1,11 @@
 import logging
 import sqlite3
-from dataclasses import asdict
-from typing import Optional
+from dataclasses import asdict, is_dataclass
+from typing import Optional, Any
 
 from scraper.exception.scraper_exception import ScraperError
-from scraper.resources.database_schema import TABLE_LIST
-from scraper.resources.models import PlayData
+from scraper.resources.database_schema import TABLE_LIST, Table
+from scraper.resources.models import PlayData, SongData
 from scraper.utils.path_resolver import resolve_app_file_path
 
 logger = logging.getLogger(__name__)
@@ -148,6 +148,216 @@ class Database:
             logger.error(f"Error inserting play data: {e}")
             return False
 
+    def insert(self, table: Table, entity: Any) -> bool:
+        """
+        Generic insert function for any dataclass-based entity.
+
+        Args:
+            table (Table): Table definition (with name and columns)
+            entity (dataclass): The dataclass instance representing a row
+
+        Returns:
+            bool: True if insert succeeded, False otherwise
+        """
+        if not is_dataclass(entity):
+            raise TypeError("Entity must be a dataclass instance")
+
+        conn = self._get_active_connection()
+        try:
+            cursor = conn.cursor()
+
+            # Convert dataclass -> dict
+            data_dict = asdict(entity)
+
+            # Keep only valid table columns
+            valid_columns = [col.name for col in table.columns if not col.primary_key or not col.autoincrement]
+            filtered_data = {k: v for k, v in data_dict.items() if k in valid_columns}
+
+            # Build SQL
+            columns = ', '.join(filtered_data.keys())
+            placeholders = ', '.join(['?' for _ in filtered_data])
+            sql = f"INSERT INTO {table.name} ({columns}) VALUES ({placeholders})"
+
+            logging.debug(f"Inserting into [{table.name}] using query:\n{sql}\nValues: {tuple(filtered_data.values())}")
+            cursor.execute(sql, tuple(filtered_data.values()))
+            conn.commit()
+
+            logger.info(f"Successfully inserted into [{table.name}]")
+            return True
+        except sqlite3.IntegrityError as e:
+            logger.error(f"Integrity error inserting into [{table.name}] with {entity} due to {e}")
+            return False
+        except sqlite3.Error as e:
+            logger.error(f"SQLite error inserting into [{table.name}]: {e}")
+            return False
+
+    from typing import Optional
+
+    from typing import Any
+
+    def upsert(self, table: Table, entity: Any) -> Any:
+        """
+        Generic upsert method for any dataclass-based entity.
+        Assumes every table has an auto-increment 'id' primary key.
+        Automatically merges partial updates with existing data.
+
+        Args:
+            table (Table): Table definition
+            entity (dataclass): Entity to insert or update (partial fields allowed)
+
+        Returns:
+            dataclass: The inserted/updated entity with auto-generated PK updated
+        """
+        if not is_dataclass(entity):
+            raise TypeError("Entity must be a dataclass instance")
+
+        entity_dict = asdict(entity)
+        conn = self._get_active_connection()
+        cursor = conn.cursor()
+
+        # Check if the entity exists based on the id
+        entity_id = entity_dict.get("id")
+        if entity_id is not None:
+            sql_check = f"SELECT * FROM {table.name} WHERE id=? LIMIT 1"
+            cursor.execute(sql_check, (entity_id,))
+            row = cursor.fetchone()
+            if row:
+                # Convert row to dict for merging
+                existing_dict = dict(row)
+                # Merge: keep existing values for fields that are None in entity
+                merged_dict = {k: entity_dict[k] if entity_dict[k] is not None else existing_dict[k]
+                               for k in existing_dict.keys()}
+
+                # Update the database with merged_dict
+                update_fields = {k: v for k, v in merged_dict.items() if k != "id"}
+                if update_fields:
+                    set_clause = ', '.join(f"{col}=?" for col in update_fields)
+                    sql_update = f"UPDATE {table.name} SET {set_clause} WHERE id=?"
+                    values = list(update_fields.values()) + [entity_id]
+                    cursor.execute(sql_update, tuple(values))
+                    conn.commit()
+
+                # Return merged entity as dataclass
+                return type(entity)(**merged_dict)
+
+        # If entity_id is None or row doesn't exist, try to find by natural key (optional)
+        # Here we assume id is the only key; for other key strategies, modify accordingly
+
+        # Insert new row
+        insert_columns = [k for k in entity_dict.keys() if k != "id"]
+        insert_values = [v for k, v in entity_dict.items() if k != "id"]
+        columns_str = ', '.join(insert_columns)
+        placeholders = ', '.join(['?'] * len(insert_columns))
+        sql_insert = f"INSERT INTO {table.name} ({columns_str}) VALUES ({placeholders})"
+        cursor.execute(sql_insert, tuple(insert_values))
+        conn.commit()
+
+        # Update entity's id with lastrowid
+        entity.id = cursor.lastrowid
+        return entity
+
+    def update(self, table: Table, entity: Any) -> bool:
+        pass
+        # if not is_dataclass(entity):
+        #     raise TypeError("Entity must be a dataclass instance")
+        #
+        # entity_dict = asdict(entity)
+        # conn = self._get_active_connection()
+        # cursor = conn.cursor()
+        #
+        # # Check if the entity exists based on the id
+        # entity_id = entity_dict.get("id")
+        # if entity_id is not None:
+        #     sql_check = f"SELECT * FROM {table.name} WHERE id=? LIMIT 1"
+        #     cursor.execute(sql_check, (entity_id,))
+        #     row = cursor.fetchone()
+        #     if row:
+        #         # Convert row to dict for merging
+        #         existing_dict = dict(row)
+        #         # Merge: keep existing values for fields that are None in entity
+        #         merged_dict = {k: entity_dict[k] if entity_dict[k] is not None else existing_dict[k]
+        #                        for k in existing_dict.keys()}
+        #
+        #         # Update the database with merged_dict
+        #         update_fields = {k: v for k, v in merged_dict.items() if k != "id"}
+        #         if update_fields:
+        #             set_clause = ', '.join(f"{col}=?" for col in update_fields)
+        #             sql_update = f"UPDATE {table.name} SET {set_clause} WHERE id=?"
+        #             values = list(update_fields.values()) + [entity_id]
+        #             cursor.execute(sql_update, tuple(values))
+        #             conn.commit()
+        #
+        #         # Return merged entity as dataclass
+        #         return type(entity)(**merged_dict)
+        #
+        # # If entity_id is None or row doesn't exist, try to find by natural key (optional)
+        # # Here we assume id is the only key; for other key strategies, modify accordingly
+        #
+        # # Insert new row
+        # insert_columns = [k for k in entity_dict.keys() if k != "id"]
+        # insert_values = [v for k, v in entity_dict.items() if k != "id"]
+        # columns_str = ', '.join(insert_columns)
+        # placeholders = ', '.join(['?'] * len(insert_columns))
+        # sql_insert = f"INSERT INTO {table.name} ({columns_str}) VALUES ({placeholders})"
+        # cursor.execute(sql_insert, tuple(insert_values))
+        # conn.commit()
+        #
+        # # Update entity's id with lastrowid
+        # entity.id = cursor.lastrowid
+        # return entity
+
+    def find(self, table: Table, filters: Any, entity_class: Optional[type] = None) -> Optional[Any]:
+        """
+        Generic select 1 query for any table.
+        Returns a dataclass instance or dict if found, else None.
+
+        Args:
+            table (Table): Table definition
+            filters (dict or dataclass): Columns to filter on. Can be a dict or dataclass instance.
+            entity_class (type, optional): Dataclass to map the row to. If None, returns dict.
+
+        Returns:
+            Dataclass instance or dict, or None if not found.
+        """
+        # Convert dataclass filters to dict
+        if is_dataclass(filters):
+            filters = asdict(filters)
+        elif not isinstance(filters, dict):
+            raise TypeError("filters must be a dataclass or dict")
+
+        # Remove None values
+        filters = {k: v for k, v in filters.items() if v is not None}
+
+        if not filters:
+            raise ValueError("At least one filter column must have a non-None value")
+
+        conn = self._get_active_connection()
+        try:
+            cursor = conn.cursor()
+
+            # Keep only valid table columns
+            valid_columns = {col.name for col in table.columns}
+            filtered_columns = {k: v for k, v in filters.items() if k in valid_columns}
+            if not filtered_columns:
+                raise ValueError("No valid columns provided in filters")
+
+            where_clause = ' AND '.join(f"{col}=?" for col in filtered_columns)
+            sql = f"SELECT * FROM {table.name} WHERE {where_clause} LIMIT 1"
+
+            cursor.execute(sql, tuple(filtered_columns.values()))
+            row = cursor.fetchone()
+
+            if row:
+                row_dict = dict(row)
+                if entity_class and is_dataclass(entity_class):
+                    return entity_class(**row_dict)
+                return row_dict
+            return None
+
+        except sqlite3.Error as e:
+            logger.error(f"Error fetching row from [{table.name}]: {e}")
+            return None
+
     def check_if_play_data_exists(self, idx: str) -> bool:
         """
         Checks if a play data record with the given 'idx' already exists in the 'play_data' table,
@@ -168,6 +378,32 @@ class Database:
         except sqlite3.Error as e:
             logger.error(f"Error checking play data existence: {e}")
             return False
+
+    def get_song_data(self, song_title: str, song_type: str) -> Optional[SongData]:
+        """
+        Fetch a play data record with the given song_title and song_type.
+
+        Args:
+            song_title (str): Song title
+            song_type (str): Normal or DX chart
+
+        Returns:
+            dict | None: The row as a dict if found, otherwise None.
+        """
+        conn = self._get_active_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM song_data WHERE song_title = ? AND song_type = ?",
+                (song_title, song_type),
+            )
+            row = cursor.fetchone()
+            if row:
+                return SongData(**dict(row))  # unpack into dataclass
+            return None
+        except sqlite3.Error as e:
+            logger.error(f"Error fetching song data: {e}")
+            return None
 
     def get_db_path_string(self) -> str:
         """

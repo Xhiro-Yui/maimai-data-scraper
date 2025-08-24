@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 
 from selenium.common.exceptions import TimeoutException
@@ -9,9 +10,12 @@ from selenium.webdriver.support.wait import WebDriverWait
 
 from scraper.constants import Endpoints
 from scraper.exception.terminate_exception import Terminate
+from scraper.resources.database_schema import SONG_DATA_TABLE
 from scraper.resources.i18n.messages import Messages
+from scraper.resources.models import SongData
 from scraper.resources.resource_manager import t
 from scraper.scrapers.scraper import Scraper
+from scraper.utils.scraping_utils import identify_song_type
 
 
 class BrowserScraper(Scraper):
@@ -36,13 +40,9 @@ class BrowserScraper(Scraper):
 
     def scrape(self) -> None:
         try:
-
-            self.driver.get(Endpoints.LOGIN_PAGE)
-
-            maintenance_dom = self.get_element_if_exists(By.CLASS_NAME, "main_info")
-            if maintenance_dom:
-                self._exit(t(Messages.Error.SERVER_UNDER_MAINTENANCE))
-            self.login()
+            # self.login()
+            self.get_song_scores()
+            self.get_latest_records()
 
             logging.info("BrowserScraper finished scraping.")
         except Exception as e:
@@ -63,6 +63,12 @@ class BrowserScraper(Scraper):
         Reminder : Always sleep awhile before doing any page interaction to make it less bot-like
         :return: True if login success
         """
+        self.driver.get(Endpoints.LOGIN_PAGE)
+
+        maintenance_dom = self.get_element_if_exists(By.CLASS_NAME, "main_info")
+        if maintenance_dom:
+            self._exit(t(Messages.Error.SERVER_UNDER_MAINTENANCE))
+
         logging.debug("Clicking the TOS checkbox...")
         # Check the TOS checkbox
         tos_checkbox = WebDriverWait(self.driver, self.wait_timeout).until(
@@ -114,3 +120,45 @@ class BrowserScraper(Scraper):
                 logging.info(f"Login failed :  {error_dom.text}")
                 return False
             return False
+
+    def get_song_scores(self):
+        # self.get_song_scores_by_difficulty("basic")
+        # self.get_song_scores_by_difficulty("advanced")
+        # self.get_song_scores_by_difficulty("expert")
+        self.get_song_scores_by_difficulty("master")
+        # self.get_song_scores_by_difficulty("remaster")
+        # self.get_song_scores_by_difficulty("utage")
+
+    def get_song_scores_by_difficulty(self, difficulty: str) -> None:
+        html_path = os.path.abspath(f"scraper/mock/song_scores_{difficulty}.html")
+        file_url = f"file:///{html_path.replace(os.sep, '/')}"  # Windows-safe
+        self.driver.get(file_url)
+        songs_dom = self.driver.find_elements(By.CLASS_NAME, f"music_{difficulty}_score_back")
+        for song_dom in songs_dom:
+            song_title = song_dom.find_element(By.CLASS_NAME, "music_name_block")
+            song_type = song_dom.find_element(By.XPATH, "..").find_element(By.CLASS_NAME,
+                                                                           "music_kind_icon").get_attribute("src")
+            score = song_dom.find_elements(By.CLASS_NAME, "music_score_block")
+
+            entity: SongData = self.database.find(SONG_DATA_TABLE,
+                                                  SongData(
+                                                      song_title=song_title.text,
+                                                      song_type=identify_song_type(song_type)
+                                                  ),
+                                                  SongData)
+            if entity:
+                # TODO : Handle dont exists (never played before)
+                setattr(entity, f"score_{difficulty}", score[0].text)
+                setattr(entity, f"dx_score_{difficulty}", score[1].text)
+                self.database.upsert(SONG_DATA_TABLE, entity)
+            else:
+                song_data = SongData(
+                    song_title=song_title.text,
+                    song_type=identify_song_type(song_type)
+                )
+                setattr(song_data, f"score_{difficulty}", score[0].text)
+                setattr(song_data, f"dx_score_{difficulty}", score[1].text)
+                self.database.upsert(SONG_DATA_TABLE, entity)
+
+    def get_latest_records(self):
+        pass

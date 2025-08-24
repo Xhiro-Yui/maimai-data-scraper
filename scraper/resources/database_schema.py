@@ -54,7 +54,7 @@ class Table:
 PLAY_DATA_TABLE = Table(
     name="play_data",
     columns=[
-        Column("id", "INTEGER", primary_key=True, autoincrement=True),
+        Column("id", "INTEGER", primary_key=True, autoincrement=True),  # Why does my entity generator make this optional
         # Creating an ID anyway cause IDX sorting is unusable due to its format
         Column("idx", "TEXT", unique=True, nullable=False),
         Column("title", "TEXT", nullable=False),
@@ -94,6 +94,25 @@ PLAYER_DATA_TABLE = Table(
     ]
 )
 
+SONG_DATA_TABLE = Table(
+    name="song_data",
+    columns=[
+        Column("id", "INTEGER", primary_key=True, autoincrement=True),
+        Column("song_title", "TEXT", nullable=False),
+        Column("song_type", "TEXT", nullable=False),
+        Column("score_basic", "TEXT"),
+        Column("dx_score_basic", "TEXT"),
+        Column("score_advanced", "TEXT"),
+        Column("dx_score_advanced", "TEXT"),
+        Column("score_expert", "TEXT"),
+        Column("dx_score_expert", "TEXT"),
+        Column("score_master", "TEXT"),
+        Column("dx_score_master", "TEXT"),
+        Column("score_remaster", "TEXT"),
+        Column("dx_score_remaster", "TEXT"),
+    ]
+)
+
 SCRAPER_METADATA_TABLE = Table(
     name="metadata",
     columns=[
@@ -102,4 +121,4 @@ SCRAPER_METADATA_TABLE = Table(
     ]
 )
 
-TABLE_LIST: List[Table] = [PLAY_DATA_TABLE, PLAYER_DATA_TABLE, SCRAPER_METADATA_TABLE]
+TABLE_LIST: List[Table] = [PLAY_DATA_TABLE, PLAYER_DATA_TABLE, SONG_DATA_TABLE, SCRAPER_METADATA_TABLE]
