@@ -20,12 +20,12 @@ class MetadataManager:
     SCRAPER_VERSION = "1.0.0"
 
     # To be updated when MaiMai website data changes
-    PLAY_DATA_VERSION = "1"
+    PLAY_DATA_VERSION = 1
 
     # Data stored versions
     # When the scraper changes the data structure
     # Should be rarely used
-    DATABASE_VERSION = "1"
+    DATABASE_VERSION = 1
 
     def __init__(self, database: Database):
         self.database = database

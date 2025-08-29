@@ -6,5 +6,5 @@ from typing import Optional
 class Metadata:
     id: Optional[int] = None
     scraper_version: str = None
-    database_version: str = None
-    play_data_version: str = None
+    database_version: int = None
+    play_data_version: int = None

@@ -47,7 +47,7 @@ def identify_song_type(song_icon_src: str) -> str:
         return "unknown"
 
 
-def find_element_attribute(container, by, selector, attr="text", index: int = 0):
+def find_element_attribute(container, by, selector, attr="text", index: int = 0) -> str | None:
     """Safely find an element and return an attribute or text, with logging.
 
     Args:

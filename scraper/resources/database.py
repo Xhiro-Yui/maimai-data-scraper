@@ -1,7 +1,7 @@
 import logging
 import sqlite3
-from dataclasses import asdict, is_dataclass
-from typing import Optional, Any, Union
+from dataclasses import asdict, is_dataclass, fields
+from typing import Optional, Any, Union, Type, TypeVar
 
 from scraper.exception.scraper_exception import ScraperError
 from scraper.resources.database_schema import TABLE_LIST, Table
@@ -9,6 +9,8 @@ from scraper.resources.models import PlayData, SongData
 from scraper.utils.path_resolver import resolve_app_file_path
 
 logger = logging.getLogger(__name__.split(".")[-1])
+
+T = TypeVar("T")  # Generic type variable for dataclass
 
 
 class Database:
@@ -191,10 +193,6 @@ class Database:
             logger.error(f"SQLite error inserting into [{table.name}]: {e}")
             return False
 
-    from typing import Optional
-
-    from typing import Any
-
     def upsert(self, table: Table, entity: Any) -> Any:
         """
         Generic upsert method for any dataclass-based entity.
@@ -310,24 +308,24 @@ class Database:
             self,
             table: Table,
             filters: Optional[Any] = None,
-            entity_class: Optional[type] = None,
+            entity_class: Optional[Type[T]] = None,
             limit: Optional[int] = 1,
-    ) -> Union[Optional[Any], list[Any]]:
+    ) -> Union[Optional[T], list[T]]:
         """
         Run a SELECT query on the given table.
 
         Args:
             table (Table): Table definition.
             filters (dict or dataclass, optional): Filter conditions. If None, selects all rows.
-            entity_class (type, optional): Dataclass to map results into. If None, returns dicts.
+            entity_class (Type[T], optional): Dataclass type to map results into. If None, returns dicts.
             limit (int or None, optional):
                 - 1 (default): return a single row or None
                 - >1: return a list of up to that many rows
                 - None: return all matching rows
 
         Returns:
-            dict or dataclass instance if limit=1,
-            otherwise a list of dicts or dataclass instances.
+            Dataclass instance or dict if limit=1,
+            otherwise a list of dataclass instances or dicts.
         """
         # Convert dataclass filters to dict
         if filters is None:
@@ -366,9 +364,30 @@ class Database:
             results = []
             for row in rows:
                 row_dict = dict(row)
-                results.append(
-                    entity_class(**row_dict) if entity_class and is_dataclass(entity_class) else row_dict
-                )
+
+                # Convert int -> bool for boolean fields in dataclass
+                data_class: Optional[Type[T]] = entity_class
+                if data_class is not None and is_dataclass(data_class):
+                    for field in fields(data_class):
+                        # runtime-safe check for bool and Optional[bool]
+                        field_type = field.type
+                        is_bool_field = False
+                        origin = getattr(field_type, "__origin__", None)
+                        args = getattr(field_type, "__args__", ())
+
+                        if field_type is bool:
+                            is_bool_field = True
+                        elif origin is Union and bool in args and type(None) in args:
+                            is_bool_field = True
+
+                        if is_bool_field and field.name in row_dict and row_dict[field.name] is not None:
+                            row_dict[field.name] = bool(row_dict[field.name])
+
+                # Map to dataclass or keep as dict
+                if data_class is not None and is_dataclass(data_class):
+                    results.append(data_class(**row_dict))
+                else:
+                    results.append(row_dict)
 
             # Return based on limit
             if limit == 1:

@@ -1,3 +1,7 @@
+from typing import Callable
+from urllib.parse import quote
+
+
 class File:
     DATABASE_NAME: str = "maimai_data.db"
     LOG_FILE: str = "scraper.log"
@@ -22,6 +26,7 @@ class Endpoints:
     LOGIN_PAGE: str
     PLAYER_DATA: str
     RECORDS: str
+    RECORD_DETAILS: Callable[[str], str]  # appends the idx into the URL
     SONG_SCORES_BASIC: str
     SONG_SCORES_ADVANCED: str
     SONG_SCORES_EXPERT: str
@@ -30,11 +35,14 @@ class Endpoints:
     SONG_SCORES_UTAGE: str
 
     # Define all endpoints per region
-    _REGIONS = {
+    REGIONS = {
         "INTL": {
             "LOGIN_PAGE": "https://maimaidx-eng.com/maimai-mobile/login/",
             "PLAYER_DATA": "https://maimaidx-eng.com/maimai-mobile/playerData/",
             "RECORDS": "https://maimaidx-eng.com/maimai-mobile/record/",
+            "RECORD_DETAILS": (
+                lambda idx: f"https://maimaidx-eng.com/maimai-mobile/record/playlogDetail/?idx={quote(str(idx))}"
+            ),
             "SONG_SCORES_BASIC": "https://maimaidx-eng.com/maimai-mobile/record/musicGenre/search/?genre=99&diff=0",
             "SONG_SCORES_ADVANCED": "https://maimaidx-eng.com/maimai-mobile/record/musicGenre/search/?genre=99&diff=1",
             "SONG_SCORES_EXPERT": "https://maimaidx-eng.com/maimai-mobile/record/musicGenre/search/?genre=99&diff=2",
@@ -46,6 +54,9 @@ class Endpoints:
             "LOGIN_PAGE": "https://maimaidx-eng.com/maimai-mobile/login/",
             "PLAYER_DATA": "https://maimaidx-eng.com/maimai-mobile/playerData/",
             "RECORDS": "https://maimaidx-eng.com/maimai-mobile/record/",
+            "RECORD_DETAILS": (
+                lambda idx: f"https://maimaidx-eng.com/maimai-mobile/record/playlogDetail/?idx={quote(str(idx))}"
+            ),
             "SONG_SCORES_BASIC": "https://maimaidx-eng.com/maimai-mobile/record/musicGenre/search/?genre=99&diff=0",
             "SONG_SCORES_ADVANCED": "https://maimaidx-eng.com/maimai-mobile/record/musicGenre/search/?genre=99&diff=1",
             "SONG_SCORES_EXPERT": "https://maimaidx-eng.com/maimai-mobile/record/musicGenre/search/?genre=99&diff=2",
@@ -61,9 +72,13 @@ def load_endpoints(region: str):
     Dynamically attach endpoints for the selected region to the Endpoints class.
     """
     region_upper = region.upper()
-    current = Endpoints._REGIONS.get(region_upper)
+    current = Endpoints.REGIONS.get(region_upper)
     if current is None:
         raise ValueError(f"Unknown REGION: {region}")
 
     for key, value in current.items():
-        setattr(Endpoints, key, value)
+        if callable(value):
+            # Wrap functions as staticmethod so they behave like class methods
+            setattr(Endpoints, key, staticmethod(value))
+        else:
+            setattr(Endpoints, key, value)
