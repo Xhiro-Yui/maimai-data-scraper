@@ -396,7 +396,10 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("SELECT 1 FROM play_data WHERE idx = ?", (idx,))
             result = cursor.fetchone()
-            return result is not None
+            if result is not None:
+                logger.info(f"Play log {idx} exists, skipping")
+                return True
+            return False
         except sqlite3.Error as e:
             logger.error(f"Error checking play data existence: {e}")
             return False
@@ -426,12 +429,3 @@ class Database:
         except sqlite3.Error as e:
             logger.error(f"Error fetching song data: {e}")
             return None
-
-    def get_db_path_string(self) -> str:
-        """
-        Returns the full absolute path to the database file.
-
-        Returns:
-            str: The database file path.
-        """
-        return self._db_path
