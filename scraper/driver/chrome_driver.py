@@ -11,7 +11,7 @@ from selenium.webdriver.chrome.webdriver import WebDriver
 
 from scraper.utils.path_resolver import resolve_app_file_path
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__.split(".")[-1])
 
 
 def get_installed_chrome_version() -> str:
@@ -24,7 +24,7 @@ def get_installed_chrome_version() -> str:
     version = chromedriver_autoinstaller.get_chrome_version()
     if not version:
         raise RuntimeError("❌ Chrome not found on this machine.")
-    logging.info(f"Installed Chrome version on machine: {version}")
+    logger.info(f"Installed Chrome version on machine: {version}")
     return version
 
 
@@ -53,11 +53,11 @@ def ensure_chromedriver(version: str) -> str:
     cached_version = props.get("version")
     cached_path = props.get("driver_path")
     if cached_version == version and cached_path and os.path.exists(cached_path):
-        logging.info(f"Matching ChromeDriver {cached_version} detected.")
+        logger.info(f"Matching ChromeDriver {cached_version} detected.")
         return cached_path
 
-    logging.info("Matching ChromeDriver version not found.")
-    logging.info(f"Downloading ChromeDriver for version {version}.")
+    logger.info("Matching ChromeDriver version not found.")
+    logger.info(f"Downloading ChromeDriver for version {version}.")
 
     latest_meta = requests.get(
         "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
@@ -80,7 +80,7 @@ def ensure_chromedriver(version: str) -> str:
         pf.write(f"version={version}\n")
         pf.write(f"driver_path={driver_path}\n")
 
-    logging.info(f"ChromeDriver {version} ready.")
+    logger.info(f"ChromeDriver {version} ready.")
     return driver_path
 
 

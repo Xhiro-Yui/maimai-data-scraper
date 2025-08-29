@@ -8,7 +8,7 @@ from dotenv import dotenv_values
 from scraper.exception.scraper_exception import ScraperError
 from scraper.utils.path_resolver import resolve_app_file_path
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__.split(".")[-1])
 
 
 class Config:
@@ -16,11 +16,11 @@ class Config:
         # Load only from .env file (ignores system env)
         config_path = resolve_app_file_path(filename)
 
-        logging.info("Checking if existing config exists...")
+        logger.info("Checking if existing config exists...")
         if not os.path.exists(config_path):
             self._generate_default_config_file(config_path)
         else:
-            logging.info("Config exists. Loading config values.")
+            logger.info("Config exists. Loading config values.")
         self._values = dotenv_values(config_path)
 
         # Validate required values
@@ -51,7 +51,7 @@ class Config:
             if missing_fields:
                 raise ScraperError(f"Missing required config values: {', '.join(missing_fields)}")
         except ScraperError as e:
-            logging.error(e)
+            logger.error(e)
             input("Press Enter to exit...")
             sys.exit(1)
 
@@ -104,10 +104,10 @@ class Config:
         # LANGUAGE should be one of the following: en, ja
         """)
 
-        logging.info("No existing config found. Creating default config file.")
+        logger.info("No existing config found. Creating default config file.")
         with open(config_path, "w") as f:
             f.write(default_config)
-        logging.info(f"First-time setup: '{os.path.abspath(config_path)}' has been created.")
-        logging.info("Please open it and fill in your USERNAME, PASSWORD, and BROWSER.")
+        logger.info(f"First-time setup: '{os.path.abspath(config_path)}' has been created.")
+        logger.info("Please open it and fill in your USERNAME, PASSWORD, and BROWSER.")
         input("Press Enter to exit...")
         sys.exit(1)

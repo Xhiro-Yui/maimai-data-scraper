@@ -15,21 +15,21 @@ from scraper.exception.scraper_exception import ScraperError
 from scraper.resources.resource_manager import resources
 from scraper.scrapers.browser_scraper import BrowserScraper
 
+logger = logging.getLogger(__name__.split(".")[-1])
+
 if __name__ == "__main__":
     try:
         if resources.config["BROWSER"].lower() == Browser.CHROME:
-            logging.info("Its chrome")
+            logger.info("Its chrome")
             scraper = BrowserScraper(resources.config, resources.database, get_chrome_driver())
             scraper.scrape()
-            # data = PlayData(idx="1,12345", title="Fake song", difficulty="13+")
-            # resources.database.insert_new_play_data(data)
 
         if resources.config["BROWSER"].lower() == Browser.FIREFOX:
-            logging.info("firefox")
+            logger.info("firefox")
         if resources.config["BROWSER"].lower() == Browser.CHROMIUM:
-            logging.info("Its chromium")
+            logger.info("Its chromium")
     except ScraperError as e:
-        logging.error(e)
+        logger.error(e)
         input("Press Enter to exit...")
         sys.exit(1)
     except Terminate:

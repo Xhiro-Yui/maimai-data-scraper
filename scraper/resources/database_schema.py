@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 
 @dataclass
@@ -30,10 +30,10 @@ class Column:
 class Table:
     """Represents a database table with its columns and indexes."""
     name: str
-    columns: List[Column]
+    columns: list[Column]
     # Indexes are defined as a list of dictionaries for flexibility
     # Each dict can contain 'name' (str), 'columns' (List[str]), 'unique' (bool)
-    indexes: List[Dict[str, Any]] = field(default_factory=list)
+    indexes: list[Dict[str, Any]] = field(default_factory=list)
 
     def generate_create_table_sql(self) -> str:
         """Generates the CREATE TABLE SQL statement for this table."""
@@ -54,23 +54,23 @@ class Table:
 PLAY_DATA_TABLE = Table(
     name="play_data",
     columns=[
-        Column("id", "INTEGER", primary_key=True, autoincrement=True),  # Why does my entity generator make this optional
         # Creating an ID anyway cause IDX sorting is unusable due to its format
+        Column("id", "INTEGER", primary_key=True, autoincrement=True),
         Column("idx", "TEXT", unique=True, nullable=False),
         Column("title", "TEXT", nullable=False),
         Column("difficulty", "TEXT", nullable=False),
-        Column("music_type", "TEXT"),
         Column("track", "TEXT"),
+        Column("music_type", "TEXT"),
+        Column("new_achievement", "BOOLEAN"),
+        Column("achievement", "TEXT"),
+        Column("rank", "TEXT"),
+        Column("new_dx_score", "BOOLEAN"),
+        Column("dx_score", "TEXT"),
+        Column("dx_stars", "INTEGER"),
+        Column("combo_status", "TEXT"),
+        Column("sync_status", "TEXT"),
         Column("place", "TEXT"),
         Column("played_at", "TEXT"),
-        Column("achievement", "TEXT"),
-        Column("score", "TEXT"),
-        Column("dx_stars", "INTEGER"),
-        Column("rank", "TEXT"),
-        Column("fc_status", "TEXT"),
-        Column("sync_status", "TEXT"),
-        Column("max_combo", "TEXT"),
-        Column("max_sync", "TEXT"),
         Column("fast", "INTEGER"),
         Column("late", "INTEGER"),
         Column("tap_detail", "TEXT"),
@@ -78,8 +78,9 @@ PLAY_DATA_TABLE = Table(
         Column("slide_detail", "TEXT"),
         Column("touch_detail", "TEXT"),
         Column("break_detail", "TEXT"),
-        Column("new_achievement", "BOOLEAN"),
-        Column("new_dx_score", "BOOLEAN")
+        Column("max_combo", "TEXT"),
+        Column("max_sync", "TEXT"),
+        Column("play_data_version", "TEXT")  # Internal scraper use to handle website changes
     ],
     indexes=[
         {"name": "idx_play_data_idx", "columns": ["idx"], "unique": True}  # Explicit unique index
@@ -90,7 +91,7 @@ PLAYER_DATA_TABLE = Table(
     name="player_data",
     columns=[
         Column("id", "INTEGER", primary_key=True, autoincrement=True),
-        Column("total_plays", "INTEGER", nullable=False)
+        Column("total_plays", "INTEGER", nullable=False),
     ]
 )
 
@@ -113,12 +114,14 @@ SONG_DATA_TABLE = Table(
     ]
 )
 
-SCRAPER_METADATA_TABLE = Table(
+METADATA_TABLE = Table(
     name="metadata",
     columns=[
+        Column("id", "INTEGER", primary_key=True),
         Column("scraper_version", "TEXT", nullable=False),
         Column("database_version", "TEXT", nullable=False),
+        Column("play_data_version", "TEXT", nullable=False),
     ]
 )
 
-TABLE_LIST: List[Table] = [PLAY_DATA_TABLE, PLAYER_DATA_TABLE, SONG_DATA_TABLE, SCRAPER_METADATA_TABLE]
+TABLE_LIST: list[Table] = [PLAY_DATA_TABLE, PLAYER_DATA_TABLE, SONG_DATA_TABLE, METADATA_TABLE]

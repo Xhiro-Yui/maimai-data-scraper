@@ -1,14 +1,14 @@
 import logging
 import sqlite3
 from dataclasses import asdict, is_dataclass
-from typing import Optional, Any
+from typing import Optional, Any, Union
 
 from scraper.exception.scraper_exception import ScraperError
 from scraper.resources.database_schema import TABLE_LIST, Table
 from scraper.resources.models import PlayData, SongData
 from scraper.utils.path_resolver import resolve_app_file_path
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__.split(".")[-1])
 
 
 class Database:
@@ -27,7 +27,7 @@ class Database:
         self._db_path: str = resolve_app_file_path(filename=self._db_name)
         self._connection: Optional[sqlite3.Connection] = None  # Persistent connection held by the object
 
-        logging.info(f"Initializing database schemas for {self._db_path}")
+        logger.info(f"Initializing database schemas for {self._db_path}")
         self._initialize_database()
 
     def _open_connection(self) -> sqlite3.Connection:
@@ -136,7 +136,7 @@ class Database:
             columns = ', '.join(data_dict.keys())
             placeholders = ', '.join(['?' for _ in data_dict.values()])
             sql = f"INSERT INTO play_data ({columns}) VALUES ({placeholders})"
-            logging.debug(f"Inserting new [play_data] using the following SQL query : \n{sql}")
+            logger.debug(f"Inserting new [play_data] using the following SQL query : \n{sql}")
             cursor.execute(sql, tuple(data_dict.values()))
             conn.commit()
             logger.info(f"Successfully inserted [play_data] with idx: {data_dict.get('idx')}")
@@ -178,7 +178,7 @@ class Database:
             placeholders = ', '.join(['?' for _ in filtered_data])
             sql = f"INSERT INTO {table.name} ({columns}) VALUES ({placeholders})"
 
-            logging.debug(f"Inserting into [{table.name}] using query:\n{sql}\nValues: {tuple(filtered_data.values())}")
+            logger.debug(f"Inserting into [{table.name}] using query:\n{sql}\nValues: {tuple(filtered_data.values())}")
             cursor.execute(sql, tuple(filtered_data.values()))
             conn.commit()
 
@@ -306,30 +306,39 @@ class Database:
         # entity.id = cursor.lastrowid
         # return entity
 
-    def find(self, table: Table, filters: Any, entity_class: Optional[type] = None) -> Optional[Any]:
+    def select(
+            self,
+            table: Table,
+            filters: Optional[Any] = None,
+            entity_class: Optional[type] = None,
+            limit: Optional[int] = 1,
+    ) -> Union[Optional[Any], list[Any]]:
         """
-        Generic select 1 query for any table.
-        Returns a dataclass instance or dict if found, else None.
+        Run a SELECT query on the given table.
 
         Args:
-            table (Table): Table definition
-            filters (dict or dataclass): Columns to filter on. Can be a dict or dataclass instance.
-            entity_class (type, optional): Dataclass to map the row to. If None, returns dict.
+            table (Table): Table definition.
+            filters (dict or dataclass, optional): Filter conditions. If None, selects all rows.
+            entity_class (type, optional): Dataclass to map results into. If None, returns dicts.
+            limit (int or None, optional):
+                - 1 (default): return a single row or None
+                - >1: return a list of up to that many rows
+                - None: return all matching rows
 
         Returns:
-            Dataclass instance or dict, or None if not found.
+            dict or dataclass instance if limit=1,
+            otherwise a list of dicts or dataclass instances.
         """
         # Convert dataclass filters to dict
-        if is_dataclass(filters):
+        if filters is None:
+            filters = {}
+        elif is_dataclass(filters):
             filters = asdict(filters)
         elif not isinstance(filters, dict):
-            raise TypeError("filters must be a dataclass or dict")
+            raise TypeError("filters must be a dataclass, dict, or None")
 
         # Remove None values
         filters = {k: v for k, v in filters.items() if v is not None}
-
-        if not filters:
-            raise ValueError("At least one filter column must have a non-None value")
 
         conn = self._get_active_connection()
         try:
@@ -338,25 +347,38 @@ class Database:
             # Keep only valid table columns
             valid_columns = {col.name for col in table.columns}
             filtered_columns = {k: v for k, v in filters.items() if k in valid_columns}
-            if not filtered_columns:
-                raise ValueError("No valid columns provided in filters")
 
-            where_clause = ' AND '.join(f"{col}=?" for col in filtered_columns)
-            sql = f"SELECT * FROM {table.name} WHERE {where_clause} LIMIT 1"
+            # Build SQL and parameters
+            if filtered_columns:
+                where_clause = ' AND '.join(f"{col}=?" for col in filtered_columns)
+                sql = f"SELECT * FROM {table.name} WHERE {where_clause}"
+                params = tuple(filtered_columns.values())
+            else:
+                sql = f"SELECT * FROM {table.name}"
+                params = ()
 
-            cursor.execute(sql, tuple(filtered_columns.values()))
-            row = cursor.fetchone()
+            if isinstance(limit, int) and limit > 0:
+                sql += f" LIMIT {limit}"
 
-            if row:
+            cursor.execute(sql, params)
+            rows = cursor.fetchall()
+
+            results = []
+            for row in rows:
                 row_dict = dict(row)
-                if entity_class and is_dataclass(entity_class):
-                    return entity_class(**row_dict)
-                return row_dict
-            return None
+                results.append(
+                    entity_class(**row_dict) if entity_class and is_dataclass(entity_class) else row_dict
+                )
+
+            # Return based on limit
+            if limit == 1:
+                return results[0] if results else None
+            else:
+                return results
 
         except sqlite3.Error as e:
-            logger.error(f"Error fetching row from [{table.name}]: {e}")
-            return None
+            logger.error(f"Error fetching row(s) from [{table.name}]: {e}")
+            return [] if limit != 1 else None
 
     def check_if_play_data_exists(self, idx: str) -> bool:
         """

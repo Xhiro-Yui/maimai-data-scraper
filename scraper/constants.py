@@ -15,7 +15,7 @@ class Browser:
 class Logging:
     DEFAULT_LEVEL: str = "INFO"
     LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-    LOG_FORMAT = "%(asctime)s - %(levelname)5s - %(message)s"
+    LOG_FORMAT = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s"
 
 
 class Endpoints:

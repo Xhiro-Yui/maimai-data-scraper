@@ -10,12 +10,14 @@ from selenium.webdriver.support.wait import WebDriverWait
 
 from scraper.constants import Endpoints
 from scraper.exception.terminate_exception import Terminate
-from scraper.resources.database_schema import SONG_DATA_TABLE
+from scraper.resources.database_schema import SONG_DATA_TABLE, PLAY_DATA_TABLE
 from scraper.resources.i18n.messages import Messages
-from scraper.resources.models import SongData
-from scraper.resources.resource_manager import t
+from scraper.resources.models import SongData, PlayData
+from scraper.resources.resource_manager import t, resources
 from scraper.scrapers.scraper import Scraper
-from scraper.utils.scraping_utils import identify_song_type
+from scraper.utils import scraping_utils as su
+
+logger = logging.getLogger(__name__.split(".")[-1])
 
 
 class BrowserScraper(Scraper):
@@ -34,23 +36,23 @@ class BrowserScraper(Scraper):
         self.wait_delay = self.config.get_int("UI_WAIT_DELAY", 5)
         self.wait_timeout = self.config.get_int("UI_WAIT_TIMEOUT", 15)
 
-        logging.info(
+        logger.info(
             f"Scraper using [{self.driver.capabilities["browserName"]} {self.driver.capabilities["browserVersion"]}]")
-        logging.debug(f"Wait delay : {self.wait_delay} | wait timeout : {self.wait_timeout}")
+        logger.debug(f"Wait delay : {self.wait_delay} | wait timeout : {self.wait_timeout}")
 
     def scrape(self) -> None:
         try:
             # self.login()
-            self.get_song_scores()
+            # self.get_song_scores()
             self.get_latest_records()
 
-            logging.info("BrowserScraper finished scraping.")
+            logger.info("BrowserScraper finished scraping.")
         except Exception as e:
-            logging.error(f"Exception occurred {e}")
+            logger.error(f"Exception occurred {e}")
             self._exit(t(Messages.Error.UNEXPECTED_ERROR))
 
     def _exit(self, exit_reason: str) -> None:
-        logging.info(f"Exiting due to : {exit_reason}")
+        logger.info(f"Exiting due to : {exit_reason}")
         self.driver.quit()
         raise Terminate()
 
@@ -69,7 +71,7 @@ class BrowserScraper(Scraper):
         if maintenance_dom:
             self._exit(t(Messages.Error.SERVER_UNDER_MAINTENANCE))
 
-        logging.debug("Clicking the TOS checkbox...")
+        logger.debug("Clicking the TOS checkbox...")
         # Check the TOS checkbox
         tos_checkbox = WebDriverWait(self.driver, self.wait_timeout).until(
             ec.element_to_be_clickable((By.ID, "agree-maimaidxex"))
@@ -77,7 +79,7 @@ class BrowserScraper(Scraper):
         time.sleep(self.wait_delay // 4)
         tos_checkbox.click()
 
-        logging.debug("Clicking the SEGA ID login button...")
+        logger.debug("Clicking the SEGA ID login button...")
         # Click the SEGA ID login button
         sega_id_button = WebDriverWait(self.driver, self.wait_timeout).until(
             ec.element_to_be_clickable((By.CLASS_NAME, "c-button--openid--segaId"))
@@ -92,7 +94,7 @@ class BrowserScraper(Scraper):
             ec.visibility_of_element_located((By.ID, "password"))
         )
 
-        logging.debug("Inputting login id and password ...")
+        logger.debug("Inputting login id and password ...")
         time.sleep(self.wait_delay // 4)
         self.driver.find_element(By.ID, "sid").clear()
         self.driver.find_element(By.ID, "sid").send_keys(self.config["USERNAME"])
@@ -111,13 +113,13 @@ class BrowserScraper(Scraper):
             WebDriverWait(self.driver, self.wait_timeout).until(
                 ec.url_contains("/maimai-mobile/home/")
             )
-            logging.info("Login successful.")
+            logger.info("Login successful.")
             return True
         except TimeoutException:
             # Timeout waiting for home page. Did log in fail?
             error_dom = self.get_element_if_exists(By.ID, "error")
             if error_dom:
-                logging.info(f"Login failed :  {error_dom.text}")
+                logger.info(f"Login failed :  {error_dom.text}")
                 return False
             return False
 
@@ -125,9 +127,10 @@ class BrowserScraper(Scraper):
         # self.get_song_scores_by_difficulty("basic")
         # self.get_song_scores_by_difficulty("advanced")
         # self.get_song_scores_by_difficulty("expert")
-        self.get_song_scores_by_difficulty("master")
+        # self.get_song_scores_by_difficulty("master")
         # self.get_song_scores_by_difficulty("remaster")
         # self.get_song_scores_by_difficulty("utage")
+        pass
 
     def get_song_scores_by_difficulty(self, difficulty: str) -> None:
         html_path = os.path.abspath(f"scraper/mock/song_scores_{difficulty}.html")
@@ -140,12 +143,12 @@ class BrowserScraper(Scraper):
                                                                            "music_kind_icon").get_attribute("src")
             score = song_dom.find_elements(By.CLASS_NAME, "music_score_block")
 
-            entity: SongData = self.database.find(SONG_DATA_TABLE,
-                                                  SongData(
-                                                      song_title=song_title.text,
-                                                      song_type=identify_song_type(song_type)
-                                                  ),
-                                                  SongData)
+            entity: SongData = self.database.select(SONG_DATA_TABLE,
+                                                    SongData(
+                                                        song_title=song_title.text,
+                                                        song_type=su.identify_song_type(song_type)
+                                                    ),
+                                                    SongData, 1)
             if entity:
                 # TODO : Handle dont exists (never played before)
                 setattr(entity, f"score_{difficulty}", score[0].text)
@@ -154,11 +157,62 @@ class BrowserScraper(Scraper):
             else:
                 song_data = SongData(
                     song_title=song_title.text,
-                    song_type=identify_song_type(song_type)
+                    song_type=su.identify_song_type(song_type)
                 )
                 setattr(song_data, f"score_{difficulty}", score[0].text)
                 setattr(song_data, f"dx_score_{difficulty}", score[1].text)
                 self.database.upsert(SONG_DATA_TABLE, entity)
 
     def get_latest_records(self):
-        pass
+        html_path = os.path.abspath("scraper/mock/records.html")
+        file_url = f"file:///{html_path.replace(os.sep, '/')}"
+        self.driver.get(file_url)
+        records_dom = self.driver.find_elements(By.CLASS_NAME, "playlog_top_container")
+        for playlog_top_dom in records_dom:
+            playlog_song_container = (
+                playlog_top_dom
+                .find_element(By.XPATH, "..")
+                .find_elements(By.XPATH, "./*")[1]
+            )
+
+            play_data = PlayData(
+                idx=su.find_element_attribute(playlog_song_container, By.XPATH, ".//form/input[@name='idx']",
+                                              "value"),
+                title=su.parse_song_title(playlog_song_container.find_element(By.CSS_SELECTOR, ".basic_block")),
+                difficulty=su.find_element_attribute(playlog_song_container, By.CSS_SELECTOR, ".playlog_level_icon",
+                                                     "text"),
+                track=su.find_element_attribute(playlog_top_dom, By.CSS_SELECTOR, ".sub_title span", "text", 0),
+                music_type=su.parse_chart_type(
+                    su.find_element_attribute(playlog_song_container, By.CLASS_NAME, "playlog_music_kind_icon",
+                                              "src")
+                ),
+                new_achievement=bool(
+                    playlog_song_container.find_elements(By.CSS_SELECTOR, ".playlog_achievement_newrecord")),
+                achievement=su.find_element_attribute(playlog_song_container, By.CSS_SELECTOR,
+                                                      ".playlog_achievement_txt", "text"),
+                rank=su.parse_rank(
+                    su.find_element_attribute(playlog_song_container, By.CSS_SELECTOR, ".playlog_scorerank", "src")
+                ),
+                new_dx_score=bool(
+                    playlog_song_container.find_elements(By.CSS_SELECTOR, ".playlog_deluxscore_newrecord")),
+                dx_score=su.find_element_attribute(playlog_song_container, By.CSS_SELECTOR,
+                                                   ".playlog_score_block .white", "text"),
+                dx_stars=su.parse_dx_stars(
+                    su.find_element_attribute(playlog_song_container, By.CSS_SELECTOR,
+                                              ".playlog_score_block .playlog_deluxscore_star", "src")
+                ),
+                combo_status=su.parse_combo(
+                    su.find_element_attribute(playlog_song_container, By.CSS_SELECTOR,
+                                              ".playlog_result_innerblock img", "src", -2)
+                ),
+                sync_status=su.parse_sync(
+                    su.find_element_attribute(playlog_song_container, By.CSS_SELECTOR,
+                                              ".playlog_result_innerblock img", "src", -1)
+                ),
+                place=su.parse_placement(
+                    playlog_song_container.find_elements(By.CSS_SELECTOR, ".playlog_matching_icon")
+                ),
+                played_at=su.find_element_attribute(playlog_top_dom, By.CSS_SELECTOR, ".sub_title span", "text", 1),
+                play_data_version=resources.play_data_version
+            )
+            self.database.upsert(PLAY_DATA_TABLE, play_data)
