@@ -9,6 +9,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.webdriver import WebDriver
 
+from scraper.resources.resource_manager import resources
 from scraper.utils.path_resolver import resolve_app_file_path
 
 logger = logging.getLogger(__name__.split(".")[-1])
@@ -103,5 +104,9 @@ def get_chrome_driver() -> WebDriver:
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/126.0.0.0 Safari/537.36"
     )
+    if resources.config.logging_level != "DEBUG":  # Only prints Chromium logs if debugging
+        logger.info("Suppressing Chrome logs")
+        options.add_experimental_option("excludeSwitches", ["enable-logging"])
+        options.add_argument("--log-level=3")
 
     return webdriver.Chrome(service=Service(driver_path), options=options)
