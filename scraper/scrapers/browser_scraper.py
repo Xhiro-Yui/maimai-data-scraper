@@ -44,11 +44,11 @@ class BrowserScraper(Scraper):
 
     def scrape(self) -> None:
         try:
-            # self.login()
+            self.login()
             # self.get_song_scores()
-            self.get_latest_records()
+            while True:
+                self.get_latest_records()
 
-            logger.info("BrowserScraper finished scraping.")
         except Exception as e:
             logger.error(f"Exception occurred {e}")
             self._exit(t(Messages.Error.UNEXPECTED_ERROR))
@@ -166,13 +166,14 @@ class BrowserScraper(Scraper):
                 self.database.upsert(SONG_DATA_TABLE, entity)
 
     def get_latest_records(self):
-        html_path = os.path.abspath("scraper/mock/records.html")
-        file_url = f"file:///{html_path.replace(os.sep, '/')}"
-        self.driver.get(file_url)
+        # html_path = os.path.abspath("scraper/mock/records.html")
+        # file_url = f"file:///{html_path.replace(os.sep, '/')}"
+        # self.driver.get(file_url)
+        self.driver.get(Endpoints.RECORDS)
         records_dom = self.driver.find_elements(By.CLASS_NAME, "playlog_top_container")
         available_idx = []
         new_idx = []
-        for playlog_top_dom in records_dom:
+        for playlog_top_dom in reversed(records_dom):
             playlog_song_container = (
                 playlog_top_dom
                 .find_element(By.XPATH, "..")
@@ -232,14 +233,66 @@ class BrowserScraper(Scraper):
             if not play_data.detailed:
                 logger.info("Orphaned records found with details still available found. Appending details")
                 self._parse_song_details([idx], play_data)
+        if not new_idx:
+            # Nothing new in this loop. Injecting a timer and sleeping
+            interval = 5 * 60  # 5 minutes interval, should be long enough even if every song is skipped non-stop
+            countdown_script = f'''
+            (function() {{
+                let box = document.getElementById('countdown-box') || (() => {{
+                    let b = document.createElement('div');
+                    b.id = 'countdown-box';
+                    Object.assign(b.style, {{
+                        position: 'fixed', top: '10px', right: '10px',
+                        padding: '10px 15px', background: 'rgba(0,0,0,0.7)',
+                        color: 'white', fontSize: '16px', borderRadius: '8px',
+                        zIndex: 9999, cursor: 'move'
+                    }});
+                    b.innerText = 'Next check in...';
+                    document.body.appendChild(b);
+                    return b;
+                }})();
+
+                let isDragging = false, offsetX = 0, offsetY = 0;
+
+                box.onmousedown = e => {{
+                    isDragging = true;
+                    offsetX = e.clientX - box.getBoundingClientRect().left;
+                    offsetY = e.clientY - box.getBoundingClientRect().top;
+                    box.style.transition = 'none';
+                }};
+
+                document.onmousemove = e => {{
+                    if(isDragging){{
+                        box.style.left = (e.clientX - offsetX) + 'px';
+                        box.style.top = (e.clientY - offsetY) + 'px';
+                        box.style.right = 'auto';
+                    }}
+                }};
+
+                document.onmouseup = () => {{ isDragging = false; }};
+
+                let seconds = {interval}; 
+                box.innerText = `Next check in ${'{'}seconds{'}'}s`;
+
+                let id = setInterval(() => {{
+                    seconds--;
+                    if(seconds <= 0){{ clearInterval(id); box.remove(); }}
+                    else {{ box.innerText = `Next check in ${'{'}seconds{'}'}s`; }}
+                }}, 1000);
+            }})();
+            '''
+            self.driver.execute_script(countdown_script)
+            logger.info(f"Waiting {interval} seconds before next check...")
+            time.sleep(interval)
 
     def _parse_song_details(self, new_idx: list[str], optional_data: Optional[PlayData] = None) -> None:
         for idx in reversed(new_idx):
             # endpoint = Endpoints.RECORD_DETAILS(idx)
-            html_path = os.path.abspath("scraper/mock/record_details.html")
-            file_url = f"file:///{html_path.replace(os.sep, '/')}"
+            # html_path = os.path.abspath("scraper/mock/record_details.html")
+            # file_url = f"file:///{html_path.replace(os.sep, '/')}"
             # Delay between page loading
-            self.driver.get(file_url)
+            # self.driver.get(file_url)
+            self.driver.get(Endpoints.RECORD_DETAILS(idx))
             time.sleep(self.wait_delay)
 
             # Fetch the existing entity for updates

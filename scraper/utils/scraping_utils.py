@@ -18,8 +18,8 @@ SYNC_MAP = {
     "sync.png": "Sync",
     "fs.png": "FS",
     "fsplus.png": "FS+",
-    "fd.png": "FD",  # placeholder (unknown actual filename)
-    "fdplus.png": "FD+",  # placeholder (unknown actual filename)
+    "fsd.png": "FSDX",
+    "fsdplus.png": "FSDX+",
 }
 
 RANK_MAP = {
