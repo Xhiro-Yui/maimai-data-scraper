@@ -286,7 +286,7 @@ class BrowserScraper(Scraper):
             time.sleep(interval)
 
     def _parse_song_details(self, new_idx: list[str], optional_data: Optional[PlayData] = None) -> None:
-        for idx in reversed(new_idx):
+        for idx in new_idx:
             # endpoint = Endpoints.RECORD_DETAILS(idx)
             # html_path = os.path.abspath("scraper/mock/record_details.html")
             # file_url = f"file:///{html_path.replace(os.sep, '/')}"

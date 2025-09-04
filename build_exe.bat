@@ -1,4 +1,7 @@
 @echo off
+REM Always run from the directory of this batch file
+cd /d "%~dp0"
+
 REM Build script for maimai_data_scraper
 echo === Cleaning old build... ===
 rmdir /s /q build
@@ -20,5 +23,4 @@ echo === Running PyInstaller ===
 call pyinstaller --onefile --name maimai_data_scraper scraper\main.py
 
 echo === Build finished ===
-
 pause
